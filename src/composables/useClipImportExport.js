@@ -2,12 +2,14 @@ function useClipImportExport() {
   const { storage, showStatus, normalizeContent } = window.clipBoardCore;
 
   let refs = null;
+  let onMenuClose = null;
 
   function buildExportData(items) {
     return items.map((item) => ({
       id: item.id,
       content: item.content,
-      createdAt: item.createdAt
+      createdAt: item.createdAt,
+      favorite: Boolean(item.favorite)
     }));
   }
 
@@ -25,6 +27,7 @@ function useClipImportExport() {
     link.click();
     URL.revokeObjectURL(url);
     showStatus("Exportação concluída.", "success");
+    if (onMenuClose) onMenuClose();
   }
 
   function isValidImportPayload(data) {
@@ -35,7 +38,9 @@ function useClipImportExport() {
       const hasContent = typeof item.content === "string" && item.content.trim();
       const hasId = typeof item.id === "string" && item.id.trim();
       const hasCreatedAt = typeof item.createdAt === "string" && item.createdAt.trim();
-      return hasContent && hasId && hasCreatedAt;
+      const hasValidFavorite =
+        item.favorite === undefined || typeof item.favorite === "boolean";
+      return hasContent && hasId && hasCreatedAt && hasValidFavorite;
     });
   }
 
@@ -67,7 +72,8 @@ function useClipImportExport() {
         merged.push({
           id: item.id,
           content: item.content.trim(),
-          createdAt: item.createdAt
+          createdAt: item.createdAt,
+          favorite: Boolean(item.favorite)
         });
         contentSet.add(normalized);
         idSet.add(item.id);
@@ -77,6 +83,7 @@ function useClipImportExport() {
       await storage.set(merged);
       window.clipCrud.renderList();
       showStatus(`Importação concluída. ${addedCount} novo(s) clip(s).`, "success");
+      if (onMenuClose) onMenuClose();
     } catch (error) {
       showStatus("Arquivo inválido: JSON malformado.", "error");
     }
@@ -84,7 +91,10 @@ function useClipImportExport() {
 
   function bindEvents() {
     refs.exportBtn.addEventListener("click", exportClips);
-    refs.importBtn.addEventListener("click", () => refs.fileInput.click());
+    refs.importBtn.addEventListener("click", () => {
+      refs.fileInput.click();
+      if (onMenuClose) onMenuClose();
+    });
     refs.fileInput.addEventListener("change", (event) => {
       const [file] = event.target.files;
       importClips(file);
@@ -94,6 +104,7 @@ function useClipImportExport() {
 
   function init(domRefs) {
     refs = domRefs;
+    onMenuClose = domRefs.onMenuClose || null;
     bindEvents();
   }
 

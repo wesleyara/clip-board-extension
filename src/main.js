@@ -10,6 +10,8 @@ const menuBtn = document.getElementById("menuBtn");
 const menuDropdown = document.getElementById("menuDropdown");
 const composer = document.getElementById("composer");
 const fabAdd = document.getElementById("fabAdd");
+const searchInput = document.getElementById("searchInput");
+const favoritesToggle = document.getElementById("favoritesToggle");
 
 window.clipCrud.init({
   clipInput,
@@ -23,7 +25,8 @@ window.clipCrud.init({
 window.clipImportExport.init({
   exportBtn,
   importBtn,
-  fileInput
+  fileInput,
+  onMenuClose: () => menuDropdown.setAttribute("hidden", "")
 });
 
 menuBtn.addEventListener("click", () => {
@@ -44,6 +47,16 @@ document.addEventListener("click", (event) => {
 fabAdd.addEventListener("click", () => {
   window.clipCrud.openComposerForNew();
   menuDropdown.setAttribute("hidden", "");
+});
+
+searchInput.addEventListener("input", (event) => {
+  window.clipCrud.setFilters({ search: event.target.value });
+});
+
+favoritesToggle.addEventListener("click", () => {
+  const isPressed = favoritesToggle.getAttribute("aria-pressed") === "true";
+  favoritesToggle.setAttribute("aria-pressed", String(!isPressed));
+  window.clipCrud.setFilters({ favoritesOnly: !isPressed });
 });
 
 menuDropdown.setAttribute("hidden", "");

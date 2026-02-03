@@ -5,9 +5,30 @@ function useClipCrud() {
   let refs = null;
   let editingId = null;
   let dragSourceId = null;
+  let dragOverTimer = null;
+  let searchTerm = "";
+  let favoritesOnly = false;
+
+  function applyFilters(items) {
+    let filtered = items;
+
+    if (searchTerm) {
+      const term = searchTerm.toLowerCase();
+      filtered = filtered.filter((item) =>
+        item.content.toLowerCase().includes(term)
+      );
+    }
+
+    if (favoritesOnly) {
+      filtered = filtered.filter((item) => item.favorite);
+    }
+
+    return filtered;
+  }
 
   async function renderList() {
     const items = await storage.get();
+    const visibleItems = applyFilters(items);
     refs.clipList.innerHTML = "";
 
     if (!items.length) {
@@ -16,9 +37,17 @@ function useClipCrud() {
       return;
     }
 
-    refs.emptyState.style.display = "none";
+    if (!visibleItems.length) {
+      refs.emptyState.style.display = "block";
+      refs.emptyState.innerHTML = "Nenhum clip encontrado para o filtro atual.";
+      refs.clipList.appendChild(refs.emptyState);
+      return;
+    }
 
-    items.forEach((item) => {
+    refs.emptyState.style.display = "none";
+    refs.emptyState.innerHTML = "Nenhum clip salvo ainda.<br>Importe sua lista ou crie um novo!";
+
+    visibleItems.forEach((item) => {
       const clipEl = document.createElement("article");
       clipEl.className = "clip";
       clipEl.setAttribute("draggable", "true");
@@ -36,6 +65,22 @@ function useClipCrud() {
 
       const actionsEl = document.createElement("div");
       actionsEl.className = "clip-actions";
+
+      const favoriteBtn = document.createElement("button");
+      favoriteBtn.className = "btn small ghost favorite-btn";
+      favoriteBtn.type = "button";
+      favoriteBtn.setAttribute("aria-pressed", String(Boolean(item.favorite)));
+      favoriteBtn.title = item.favorite ? "Desfavoritar" : "Favoritar";
+      favoriteBtn.textContent = item.favorite ? "★" : "☆";
+      favoriteBtn.addEventListener("click", async () => {
+        const updated = (await storage.get()).map((clip) =>
+          clip.id === item.id
+            ? { ...clip, favorite: !clip.favorite }
+            : clip
+        );
+        await storage.set(updated);
+        renderList();
+      });
 
       const editBtn = document.createElement("button");
       editBtn.className = "btn small ghost";
@@ -64,6 +109,8 @@ function useClipCrud() {
       removeBtn.className = "btn small danger";
       removeBtn.textContent = "Remover";
       removeBtn.addEventListener("click", async () => {
+        const confirmed = window.confirm("Remover este clip?");
+        if (!confirmed) return;
         const updated = (await storage.get()).filter(
           (clip) => clip.id !== item.id
         );
@@ -72,7 +119,7 @@ function useClipCrud() {
         showStatus("Clip removido.", "success");
       });
 
-      actionsEl.append(copyBtn, editBtn, removeBtn);
+      actionsEl.append(favoriteBtn, copyBtn, editBtn, removeBtn);
       metaEl.append(dateEl, actionsEl);
       clipEl.append(contentEl, metaEl);
 
@@ -81,14 +128,25 @@ function useClipCrud() {
         event.dataTransfer.effectAllowed = "move";
         event.dataTransfer.setData("text/plain", item.id);
         clipEl.classList.add("dragging");
+        refs.clipList.classList.add("dragging-list");
       });
 
       clipEl.addEventListener("dragend", () => {
         clipEl.classList.remove("dragging");
         dragSourceId = null;
+        refs.clipList.classList.remove("dragging-list");
         document.querySelectorAll(".clip.drag-over").forEach((el) => {
           el.classList.remove("drag-over");
         });
+      });
+
+      clipEl.addEventListener("dragenter", (event) => {
+        event.preventDefault();
+        if (dragOverTimer) {
+          clearTimeout(dragOverTimer);
+          dragOverTimer = null;
+        }
+        clipEl.classList.add("drag-over");
       });
 
       clipEl.addEventListener("dragover", (event) => {
@@ -98,7 +156,10 @@ function useClipCrud() {
       });
 
       clipEl.addEventListener("dragleave", () => {
-        clipEl.classList.remove("drag-over");
+        if (dragOverTimer) clearTimeout(dragOverTimer);
+        dragOverTimer = setTimeout(() => {
+          clipEl.classList.remove("drag-over");
+        }, 60);
       });
 
       clipEl.addEventListener("drop", async (event) => {
@@ -165,7 +226,8 @@ function useClipCrud() {
       const newItem = {
         id: createId(),
         content,
-        createdAt: new Date().toISOString()
+        createdAt: new Date().toISOString(),
+        favorite: false
       };
 
       items.unshift(newItem);
@@ -186,6 +248,16 @@ function useClipCrud() {
     refs.addBtn.textContent = "Salvar";
     refs.composer.hidden = false;
     refs.clipInput.focus();
+  }
+
+  function setFilters({ search, favoritesOnly: favoritesOnlyNext }) {
+    if (typeof search === "string") {
+      searchTerm = search.trim();
+    }
+    if (typeof favoritesOnlyNext === "boolean") {
+      favoritesOnly = favoritesOnlyNext;
+    }
+    renderList();
   }
 
   function bindEvents() {
@@ -212,7 +284,8 @@ function useClipCrud() {
   return {
     init,
     renderList,
-    openComposerForNew
+    openComposerForNew,
+    setFilters
   };
 }
 

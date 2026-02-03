@@ -48,6 +48,24 @@
 
       <section class="status" aria-live="polite" id="status"></section>
 
+      <section class="filters">
+        <input
+          id="searchInput"
+          class="input"
+          type="search"
+          placeholder="Buscar clips..."
+          aria-label="Buscar clips"
+        />
+        <button
+          id="favoritesToggle"
+          class="btn ghost"
+          type="button"
+          aria-pressed="false"
+        >
+          Favoritos
+        </button>
+      </section>
+
       <section class="list" id="clipList">
         <div class="empty" id="emptyState"> 
           Nenhum clip salvo ainda.
