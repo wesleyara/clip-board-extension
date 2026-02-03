@@ -1,0 +1,11 @@
+{
+  "manifest_version": 3,
+  "name": "Clip Board",
+  "version": "1.0.0",
+  "description": "Salve, organize e copie rapidamente vários textos personalizados.",
+  "action": {
+    "default_title": "Clip Board",
+    "default_popup": "popup.html"
+  },
+  "permissions": ["storage", "clipboardWrite"]
+}

@@ -1,0 +1,12 @@
+[
+  {
+    "id": "clip_1700000000000_abcd1234",
+    "content": "Olá! Este é um clip de exemplo.",
+    "createdAt": "2026-02-03T10:00:00.000Z"
+  },
+  {
+    "id": "clip_1700000000001_efgh5678",
+    "content": "Use Ctrl+Enter para adicionar rapidamente um texto.",
+    "createdAt": "2026-02-03T10:05:00.000Z"
+  }
+]

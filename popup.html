@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="pt-br">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Clip Board</title>
+    <link rel="stylesheet" href="src/styles/global.css" />
+  </head>
+  <body>
+    <main class="app">
+      <header class="header">
+        <div class="menu">
+          <button id="menuBtn" class="icon-btn icon-btn-md" aria-label="Abrir menu">
+            ⋮
+          </button>
+          <div id="menuDropdown" class="menu-dropdown" hidden>
+            <button id="exportBtn" class="menu-item">Exportar</button>
+            <button id="importBtn" class="menu-item">Importar</button>
+            <input
+              id="fileInput"
+              type="file"
+              accept="application/json"
+              hidden
+            />
+          </div>
+        </div>
+
+        <h1 class="title">Clip Board</h1>
+
+        <button id="fabAdd" class="btn primary icon-btn-md" aria-label="Abrir menu">
+          +
+        </button>
+      </header>
+
+      <section id="composer" class="composer" hidden>
+        <label class="label" for="clipInput">Novo clip</label>
+        <textarea
+          id="clipInput"
+          class="textarea"
+          placeholder="Digite um texto para salvar..."
+          rows="3"
+        ></textarea>
+        <div class="actions minimal">
+          <button id="addBtn" class="btn primary">Salvar</button>
+          <button id="cancelBtn" class="btn ghost">Cancelar</button>
+        </div>
+      </section>
+
+      <section class="status" aria-live="polite" id="status"></section>
+
+      <section class="list" id="clipList">
+        <div class="empty" id="emptyState"> 
+          Nenhum clip salvo ainda.
+          <br>
+          Importe sua lista ou crie um novo!
+        </div>
+      </section>
+    </main>
+
+    <script src="src/composables/useCore.js"></script>
+    <script src="src/composables/useClipCrud.js"></script>
+    <script src="src/composables/useClipImportExport.js"></script>
+    <script src="src/main.js"></script>
+  </body>
+</html>
