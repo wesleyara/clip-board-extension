@@ -7,7 +7,7 @@ function useClipCrud() {
   let dragSourceId = null;
   let dragOverTimer = null;
   let searchTerm = "";
-  let favoritesOnly = false;
+  let filterMode = "all";
 
   function applyFilters(items) {
     let filtered = items;
@@ -19,8 +19,15 @@ function useClipCrud() {
       );
     }
 
-    if (favoritesOnly) {
+    if (filterMode === "favorites") {
       filtered = filtered.filter((item) => item.favorite);
+    }
+
+    if (filterMode === "mostCopied") {
+      filtered = filtered.filter((item) => (item.copyCount || 0) > 0);
+      filtered = filtered
+        .slice()
+        .sort((a, b) => (b.copyCount || 0) - (a.copyCount || 0));
     }
 
     return filtered;
@@ -50,7 +57,8 @@ function useClipCrud() {
     visibleItems.forEach((item) => {
       const clipEl = document.createElement("article");
       clipEl.className = "clip";
-      clipEl.setAttribute("draggable", "true");
+      const enableDragAndDrop = filterMode !== "mostCopied";
+      clipEl.setAttribute("draggable", String(enableDragAndDrop));
       clipEl.dataset.clipId = item.id;
 
       const contentEl = document.createElement("div");
@@ -99,6 +107,15 @@ function useClipCrud() {
       copyBtn.addEventListener("click", async () => {
         try {
           await navigator.clipboard.writeText(item.content);
+          const updated = (await storage.get()).map((clip) =>
+            clip.id === item.id
+              ? { ...clip, copyCount: (clip.copyCount || 0) + 1 }
+              : clip
+          );
+          await storage.set(updated);
+          if (filterMode === "mostCopied") {
+            renderList();
+          }
           showStatus("Texto copiado!", "success");
         } catch (error) {
           showStatus("Não foi possível copiar.", "error");
@@ -123,56 +140,58 @@ function useClipCrud() {
       metaEl.append(dateEl, actionsEl);
       clipEl.append(contentEl, metaEl);
 
-      clipEl.addEventListener("dragstart", (event) => {
-        dragSourceId = item.id;
-        event.dataTransfer.effectAllowed = "move";
-        event.dataTransfer.setData("text/plain", item.id);
-        clipEl.classList.add("dragging");
-        refs.clipList.classList.add("dragging-list");
-      });
-
-      clipEl.addEventListener("dragend", () => {
-        clipEl.classList.remove("dragging");
-        dragSourceId = null;
-        refs.clipList.classList.remove("dragging-list");
-        document.querySelectorAll(".clip.drag-over").forEach((el) => {
-          el.classList.remove("drag-over");
+      if (enableDragAndDrop) {
+        clipEl.addEventListener("dragstart", (event) => {
+          dragSourceId = item.id;
+          event.dataTransfer.effectAllowed = "move";
+          event.dataTransfer.setData("text/plain", item.id);
+          clipEl.classList.add("dragging");
+          refs.clipList.classList.add("dragging-list");
         });
-      });
 
-      clipEl.addEventListener("dragenter", (event) => {
-        event.preventDefault();
-        if (dragOverTimer) {
-          clearTimeout(dragOverTimer);
-          dragOverTimer = null;
-        }
-        clipEl.classList.add("drag-over");
-      });
+        clipEl.addEventListener("dragend", () => {
+          clipEl.classList.remove("dragging");
+          dragSourceId = null;
+          refs.clipList.classList.remove("dragging-list");
+          document.querySelectorAll(".clip.drag-over").forEach((el) => {
+            el.classList.remove("drag-over");
+          });
+        });
 
-      clipEl.addEventListener("dragover", (event) => {
-        event.preventDefault();
-        event.dataTransfer.dropEffect = "move";
-        clipEl.classList.add("drag-over");
-      });
+        clipEl.addEventListener("dragenter", (event) => {
+          event.preventDefault();
+          if (dragOverTimer) {
+            clearTimeout(dragOverTimer);
+            dragOverTimer = null;
+          }
+          clipEl.classList.add("drag-over");
+        });
 
-      clipEl.addEventListener("dragleave", () => {
-        if (dragOverTimer) clearTimeout(dragOverTimer);
-        dragOverTimer = setTimeout(() => {
+        clipEl.addEventListener("dragover", (event) => {
+          event.preventDefault();
+          event.dataTransfer.dropEffect = "move";
+          clipEl.classList.add("drag-over");
+        });
+
+        clipEl.addEventListener("dragleave", () => {
+          if (dragOverTimer) clearTimeout(dragOverTimer);
+          dragOverTimer = setTimeout(() => {
+            clipEl.classList.remove("drag-over");
+          }, 60);
+        });
+
+        clipEl.addEventListener("drop", async (event) => {
+          event.preventDefault();
           clipEl.classList.remove("drag-over");
-        }, 60);
-      });
+          const sourceId = dragSourceId || event.dataTransfer.getData("text/plain");
+          const targetId = item.id;
+          if (!sourceId || sourceId === targetId) return;
 
-      clipEl.addEventListener("drop", async (event) => {
-        event.preventDefault();
-        clipEl.classList.remove("drag-over");
-        const sourceId = dragSourceId || event.dataTransfer.getData("text/plain");
-        const targetId = item.id;
-        if (!sourceId || sourceId === targetId) return;
-
-        const reordered = await reorderItems(sourceId, targetId);
-        await storage.set(reordered);
-        renderList();
-      });
+          const reordered = await reorderItems(sourceId, targetId);
+          await storage.set(reordered);
+          renderList();
+        });
+      }
 
       refs.clipList.appendChild(clipEl);
     });
@@ -227,7 +246,8 @@ function useClipCrud() {
         id: createId(),
         content,
         createdAt: new Date().toISOString(),
-        favorite: false
+        favorite: false,
+        copyCount: 0
       };
 
       items.unshift(newItem);
@@ -250,12 +270,12 @@ function useClipCrud() {
     refs.clipInput.focus();
   }
 
-  function setFilters({ search, favoritesOnly: favoritesOnlyNext }) {
+  function setFilters({ search, filterMode: filterModeNext }) {
     if (typeof search === "string") {
       searchTerm = search.trim();
     }
-    if (typeof favoritesOnlyNext === "boolean") {
-      favoritesOnly = favoritesOnlyNext;
+    if (typeof filterModeNext === "string") {
+      filterMode = filterModeNext;
     }
     renderList();
   }

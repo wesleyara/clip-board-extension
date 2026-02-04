@@ -11,7 +11,7 @@ const menuDropdown = document.getElementById("menuDropdown");
 const composer = document.getElementById("composer");
 const fabAdd = document.getElementById("fabAdd");
 const searchInput = document.getElementById("searchInput");
-const favoritesToggle = document.getElementById("favoritesToggle");
+const filterSelect = document.getElementById("filterSelect");
 
 window.clipCrud.init({
   clipInput,
@@ -53,10 +53,8 @@ searchInput.addEventListener("input", (event) => {
   window.clipCrud.setFilters({ search: event.target.value });
 });
 
-favoritesToggle.addEventListener("click", () => {
-  const isPressed = favoritesToggle.getAttribute("aria-pressed") === "true";
-  favoritesToggle.setAttribute("aria-pressed", String(!isPressed));
-  window.clipCrud.setFilters({ favoritesOnly: !isPressed });
+filterSelect.addEventListener("change", (event) => {
+  window.clipCrud.setFilters({ filterMode: event.target.value });
 });
 
 menuDropdown.setAttribute("hidden", "");

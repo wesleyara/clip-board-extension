@@ -9,7 +9,8 @@ function useClipImportExport() {
       id: item.id,
       content: item.content,
       createdAt: item.createdAt,
-      favorite: Boolean(item.favorite)
+      favorite: Boolean(item.favorite),
+      copyCount: Number(item.copyCount || 0)
     }));
   }
 
@@ -40,7 +41,9 @@ function useClipImportExport() {
       const hasCreatedAt = typeof item.createdAt === "string" && item.createdAt.trim();
       const hasValidFavorite =
         item.favorite === undefined || typeof item.favorite === "boolean";
-      return hasContent && hasId && hasCreatedAt && hasValidFavorite;
+      const hasValidCopyCount =
+        item.copyCount === undefined || Number.isFinite(item.copyCount);
+      return hasContent && hasId && hasCreatedAt && hasValidFavorite && hasValidCopyCount;
     });
   }
 
@@ -73,7 +76,8 @@ function useClipImportExport() {
           id: item.id,
           content: item.content.trim(),
           createdAt: item.createdAt,
-          favorite: Boolean(item.favorite)
+          favorite: Boolean(item.favorite),
+          copyCount: Number(item.copyCount || 0)
         });
         contentSet.add(normalized);
         idSet.add(item.id);
