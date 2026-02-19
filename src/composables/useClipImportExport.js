@@ -10,8 +10,7 @@ function useClipImportExport() {
       content: item.content,
       tags: Array.isArray(item.tags) ? item.tags : [],
       createdAt: item.createdAt,
-      favorite: Boolean(item.favorite),
-      copyCount: Number(item.copyCount || 0)
+      favorite: Boolean(item.favorite)
     }));
   }
 
@@ -59,8 +58,6 @@ function useClipImportExport() {
       const hasCreatedAt = typeof item.createdAt === "string" && item.createdAt.trim();
       const hasValidFavorite =
         item.favorite === undefined || typeof item.favorite === "boolean";
-      const hasValidCopyCount =
-        item.copyCount === undefined || Number.isFinite(item.copyCount);
       const hasValidTags =
         item.tags === undefined ||
         (Array.isArray(item.tags) && item.tags.every((tag) => typeof tag === "string"));
@@ -69,7 +66,6 @@ function useClipImportExport() {
         hasId &&
         hasCreatedAt &&
         hasValidFavorite &&
-        hasValidCopyCount &&
         hasValidTags
       );
     });
@@ -105,8 +101,7 @@ function useClipImportExport() {
           content: item.content.trim(),
           tags: normalizeTags(item.tags),
           createdAt: item.createdAt,
-          favorite: Boolean(item.favorite),
-          copyCount: Number(item.copyCount || 0)
+          favorite: Boolean(item.favorite)
         });
         contentSet.add(normalized);
         idSet.add(item.id);

@@ -17,6 +17,10 @@ function useClipCrud() {
     return mode === "all" ? "all" : "any";
   }
 
+  function normalizeFilterMode(mode) {
+    return ["all", "favorites", "tag"].includes(mode) ? mode : "all";
+  }
+
   async function persistFilters() {
     await uiStateStorage.set({
       searchTerm,
@@ -34,7 +38,7 @@ function useClipCrud() {
       searchTerm = saved.searchTerm;
     }
     if (typeof saved.filterMode === "string") {
-      filterMode = saved.filterMode;
+      filterMode = normalizeFilterMode(saved.filterMode);
     }
     if (typeof saved.tagFilterMatchMode === "string") {
       tagFilterMatchMode = normalizeTagFilterMatchMode(saved.tagFilterMatchMode);
@@ -109,6 +113,9 @@ function useClipCrud() {
     }
 
     availableTags.forEach((tag) => {
+      const tagWrap = document.createElement("div");
+      tagWrap.className = "tag-chip-wrap";
+
       const tagBtn = document.createElement("button");
       tagBtn.type = "button";
       tagBtn.className = "tag-chip";
@@ -129,7 +136,19 @@ function useClipCrud() {
         renderTagOptions();
       });
 
-      refs.tagOptions.appendChild(tagBtn);
+      const removeBtn = document.createElement("button");
+      removeBtn.type = "button";
+      removeBtn.className = "tag-chip-remove";
+      removeBtn.textContent = "×";
+      removeBtn.title = `Remover tag ${tag}`;
+      removeBtn.setAttribute("aria-label", `Remover tag ${tag}`);
+      removeBtn.addEventListener("click", async (event) => {
+        event.stopPropagation();
+        await removeTagEverywhere(tag);
+      });
+
+      tagWrap.append(tagBtn, removeBtn);
+      refs.tagOptions.appendChild(tagWrap);
     });
   }
 
@@ -162,6 +181,47 @@ function useClipCrud() {
     return availableTags.filter((tag) => selectedTags.has(tag.toLowerCase()));
   }
 
+  async function removeTagEverywhere(tag) {
+    const normalized = normalizeTag(tag);
+    if (!normalized) return;
+
+    const confirmed = window.confirm(
+      `Remover a tag "${normalized}" de todos os clips associados?`
+    );
+    if (!confirmed) return;
+
+    const key = normalized.toLowerCase();
+    const items = await storage.get();
+
+    const updated = items.map((item) => {
+      const itemTags = Array.isArray(item.tags) ? item.tags : [];
+      if (!itemTags.length) return item;
+
+      const nextTags = itemTags.filter(
+        (itemTag) => normalizeTag(itemTag).toLowerCase() !== key
+      );
+
+      if (nextTags.length === itemTags.length) {
+        return item;
+      }
+
+      return { ...item, tags: nextTags };
+    });
+
+    await storage.set(updated);
+
+    selectedTags.delete(key);
+    selectedTagFilters.delete(key);
+    availableTags = extractTagsFromItems(updated);
+
+    await persistFilters();
+    renderTagOptions();
+    renderTagFilterOptions();
+    syncTagFilterVisibility();
+    renderList();
+    showStatus(`Tag "${normalized}" removida.`, "success");
+  }
+
   function renderTagFilterOptions() {
     if (!refs?.tagFilterOptions) return;
 
@@ -182,6 +242,9 @@ function useClipCrud() {
 
     availableTags.forEach((tag) => {
       const key = tag.toLowerCase();
+      const tagWrap = document.createElement("div");
+      tagWrap.className = "tag-chip-wrap";
+
       const tagBtn = document.createElement("button");
       tagBtn.type = "button";
       tagBtn.className = "tag-chip";
@@ -203,7 +266,19 @@ function useClipCrud() {
         renderList();
       });
 
-      refs.tagFilterOptions.appendChild(tagBtn);
+      const removeBtn = document.createElement("button");
+      removeBtn.type = "button";
+      removeBtn.className = "tag-chip-remove";
+      removeBtn.textContent = "×";
+      removeBtn.title = `Remover tag ${tag}`;
+      removeBtn.setAttribute("aria-label", `Remover tag ${tag}`);
+      removeBtn.addEventListener("click", async (event) => {
+        event.stopPropagation();
+        await removeTagEverywhere(tag);
+      });
+
+      tagWrap.append(tagBtn, removeBtn);
+      refs.tagFilterOptions.appendChild(tagWrap);
     });
 
     const clearBtn = document.createElement("button");
@@ -250,13 +325,6 @@ function useClipCrud() {
       filtered = filtered.filter((item) => item.favorite);
     }
 
-    if (filterMode === "mostCopied") {
-      filtered = filtered.filter((item) => (item.copyCount || 0) > 0);
-      filtered = filtered
-        .slice()
-        .sort((a, b) => (b.copyCount || 0) - (a.copyCount || 0));
-    }
-
     if (filterMode === "tag" && selectedTagFilters.size) {
       filtered = filtered.filter((item) => {
         const tags = Array.isArray(item.tags) ? item.tags : [];
@@ -301,8 +369,8 @@ function useClipCrud() {
     visibleItems.forEach((item) => {
       const clipEl = document.createElement("article");
       clipEl.className = "clip";
-      const enableDragAndDrop = filterMode !== "mostCopied";
-      clipEl.setAttribute("draggable", String(enableDragAndDrop));
+      const enableDragAndDrop = true;
+      clipEl.setAttribute("draggable", "true");
       clipEl.dataset.clipId = item.id;
 
       const contentEl = document.createElement("div");
@@ -373,15 +441,6 @@ function useClipCrud() {
       copyBtn.addEventListener("click", async () => {
         try {
           await navigator.clipboard.writeText(item.content);
-          const updated = (await storage.get()).map((clip) =>
-            clip.id === item.id
-              ? { ...clip, copyCount: (clip.copyCount || 0) + 1 }
-              : clip
-          );
-          await storage.set(updated);
-          if (filterMode === "mostCopied") {
-            renderList();
-          }
           showStatus("Texto copiado!", "success");
         } catch (error) {
           showStatus("Não foi possível copiar.", "error");
@@ -515,8 +574,7 @@ function useClipCrud() {
         content,
         tags,
         createdAt: new Date().toISOString(),
-        favorite: false,
-        copyCount: 0
+        favorite: false
       };
 
       items.unshift(newItem);
@@ -552,7 +610,7 @@ function useClipCrud() {
       searchTerm = search.trim();
     }
     if (typeof filterModeNext === "string") {
-      filterMode = filterModeNext;
+      filterMode = normalizeFilterMode(filterModeNext);
     }
     if (Array.isArray(tagFilters)) {
       selectedTagFilters = new Set(

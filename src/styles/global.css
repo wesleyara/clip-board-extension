@@ -156,6 +156,12 @@ body {
   flex-wrap: wrap;
 }
 
+.tag-chip-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
 .tag-empty {
   font-size: 11px;
   color: var(--muted);
@@ -174,6 +180,24 @@ body {
 .tag-chip.selected {
   border-color: rgba(34, 197, 94, 0.7);
   background: rgba(34, 197, 94, 0.2);
+}
+
+.tag-chip-remove {
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: #fca5a5;
+  font-size: 11px;
+  width: 22px;
+  height: 22px;
+  line-height: 1;
+  padding: 0;
+  cursor: pointer;
+}
+
+.tag-chip-remove:hover {
+  border-color: rgba(239, 68, 68, 0.6);
+  background: rgba(239, 68, 68, 0.12);
 }
 
 .actions {
