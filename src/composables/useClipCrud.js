@@ -1,11 +1,11 @@
 function useClipCrud() {
   const { storage, uiStateStorage, showStatus, formatDate, createId, normalizeContent } =
     window.clipBoardCore;
+  const tagManager = window.createClipTagManager({ storage, showStatus });
+  const dndManager = window.createClipDnDManager({ storage });
 
   let refs = null;
   let editingId = null;
-  let dragSourceId = null;
-  let dragOverTimer = null;
   let searchTerm = "";
   let filterMode = "all";
   let selectedTagFilters = new Set();
@@ -72,26 +72,11 @@ function useClipCrud() {
   }
 
   function normalizeTag(tag) {
-    return String(tag || "").trim().replace(/\s+/g, " ");
+    return tagManager.normalizeTag(tag);
   }
 
   function extractTagsFromItems(items) {
-    const byKey = new Map();
-    items.forEach((item) => {
-      const tags = Array.isArray(item.tags) ? item.tags : [];
-      tags.forEach((tag) => {
-        const normalized = normalizeTag(tag);
-        if (!normalized) return;
-        const key = normalized.toLowerCase();
-        if (!byKey.has(key)) {
-          byKey.set(key, normalized);
-        }
-      });
-    });
-
-    return Array.from(byKey.values()).sort((a, b) =>
-      a.localeCompare(b, "pt-BR", { sensitivity: "base" })
-    );
+    return tagManager.extractTagsFromItems(items);
   }
 
   async function refreshAvailableTags() {
@@ -102,31 +87,12 @@ function useClipCrud() {
   function renderTagOptions() {
     if (!refs?.tagOptions) return;
 
-    refs.tagOptions.innerHTML = "";
-
-    if (!availableTags.length) {
-      const emptyTags = document.createElement("span");
-      emptyTags.className = "tag-empty";
-      emptyTags.textContent = "Nenhuma tag criada ainda.";
-      refs.tagOptions.appendChild(emptyTags);
-      return;
-    }
-
-    availableTags.forEach((tag) => {
-      const tagWrap = document.createElement("div");
-      tagWrap.className = "tag-chip-wrap";
-
-      const tagBtn = document.createElement("button");
-      tagBtn.type = "button";
-      tagBtn.className = "tag-chip";
-      const isSelected = selectedTags.has(tag.toLowerCase());
-      if (isSelected) {
-        tagBtn.classList.add("selected");
-      }
-      tagBtn.setAttribute("aria-pressed", String(isSelected));
-      tagBtn.textContent = tag;
-
-      tagBtn.addEventListener("click", () => {
+    tagManager.renderTagSelection({
+      container: refs.tagOptions,
+      availableTags,
+      selectedKeys: selectedTags,
+      emptyText: "Nenhuma tag criada ainda.",
+      onToggle: (tag) => {
         const key = tag.toLowerCase();
         if (selectedTags.has(key)) {
           selectedTags.delete(key);
@@ -134,21 +100,10 @@ function useClipCrud() {
           selectedTags.add(key);
         }
         renderTagOptions();
-      });
-
-      const removeBtn = document.createElement("button");
-      removeBtn.type = "button";
-      removeBtn.className = "tag-chip-remove";
-      removeBtn.textContent = "×";
-      removeBtn.title = `Remover tag ${tag}`;
-      removeBtn.setAttribute("aria-label", `Remover tag ${tag}`);
-      removeBtn.addEventListener("click", async (event) => {
-        event.stopPropagation();
-        await removeTagEverywhere(tag);
-      });
-
-      tagWrap.append(tagBtn, removeBtn);
-      refs.tagOptions.appendChild(tagWrap);
+      },
+      onRemove: (tag) => {
+        removeTagEverywhere(tag);
+      }
     });
   }
 
@@ -182,80 +137,37 @@ function useClipCrud() {
   }
 
   async function removeTagEverywhere(tag) {
-    const normalized = normalizeTag(tag);
-    if (!normalized) return;
+    await tagManager.removeTagEverywhere(tag, {
+      onAfterRemove: async ({ updatedItems, removedKey }) => {
+        selectedTags.delete(removedKey);
+        selectedTagFilters.delete(removedKey);
+        availableTags = extractTagsFromItems(updatedItems);
 
-    const confirmed = window.confirm(
-      `Remover a tag "${normalized}" de todos os clips associados?`
-    );
-    if (!confirmed) return;
-
-    const key = normalized.toLowerCase();
-    const items = await storage.get();
-
-    const updated = items.map((item) => {
-      const itemTags = Array.isArray(item.tags) ? item.tags : [];
-      if (!itemTags.length) return item;
-
-      const nextTags = itemTags.filter(
-        (itemTag) => normalizeTag(itemTag).toLowerCase() !== key
-      );
-
-      if (nextTags.length === itemTags.length) {
-        return item;
+        await persistFilters();
+        renderTagOptions();
+        renderTagFilterOptions();
+        syncTagFilterVisibility();
+        renderList();
       }
-
-      return { ...item, tags: nextTags };
     });
-
-    await storage.set(updated);
-
-    selectedTags.delete(key);
-    selectedTagFilters.delete(key);
-    availableTags = extractTagsFromItems(updated);
-
-    await persistFilters();
-    renderTagOptions();
-    renderTagFilterOptions();
-    syncTagFilterVisibility();
-    renderList();
-    showStatus(`Tag "${normalized}" removida.`, "success");
   }
 
   function renderTagFilterOptions() {
     if (!refs?.tagFilterOptions) return;
-
-    refs.tagFilterOptions.innerHTML = "";
 
     const validKeys = new Set(availableTags.map((tag) => tag.toLowerCase()));
     selectedTagFilters = new Set(
       Array.from(selectedTagFilters).filter((key) => validKeys.has(key))
     );
 
-    if (!availableTags.length) {
-      const emptyTags = document.createElement("span");
-      emptyTags.className = "tag-empty";
-      emptyTags.textContent = "Nenhuma tag disponível para filtrar.";
-      refs.tagFilterOptions.appendChild(emptyTags);
-      return;
-    }
-
-    availableTags.forEach((tag) => {
-      const key = tag.toLowerCase();
-      const tagWrap = document.createElement("div");
-      tagWrap.className = "tag-chip-wrap";
-
-      const tagBtn = document.createElement("button");
-      tagBtn.type = "button";
-      tagBtn.className = "tag-chip";
-      const isSelected = selectedTagFilters.has(key);
-      if (isSelected) {
-        tagBtn.classList.add("selected");
-      }
-      tagBtn.setAttribute("aria-pressed", String(isSelected));
-      tagBtn.textContent = tag;
-
-      tagBtn.addEventListener("click", async () => {
+    tagManager.renderTagFilterSelection({
+      container: refs.tagFilterOptions,
+      availableTags,
+      selectedKeys: selectedTagFilters,
+      emptyText: "Nenhuma tag disponível para filtrar.",
+      clearDisabled: selectedTagFilters.size === 0,
+      onToggle: async (tag) => {
+        const key = tag.toLowerCase();
         if (selectedTagFilters.has(key)) {
           selectedTagFilters.delete(key);
         } else {
@@ -264,36 +176,18 @@ function useClipCrud() {
         renderTagFilterOptions();
         await persistFilters();
         renderList();
-      });
-
-      const removeBtn = document.createElement("button");
-      removeBtn.type = "button";
-      removeBtn.className = "tag-chip-remove";
-      removeBtn.textContent = "×";
-      removeBtn.title = `Remover tag ${tag}`;
-      removeBtn.setAttribute("aria-label", `Remover tag ${tag}`);
-      removeBtn.addEventListener("click", async (event) => {
-        event.stopPropagation();
-        await removeTagEverywhere(tag);
-      });
-
-      tagWrap.append(tagBtn, removeBtn);
-      refs.tagFilterOptions.appendChild(tagWrap);
+      },
+      onRemove: (tag) => {
+        removeTagEverywhere(tag);
+      },
+      onClear: async () => {
+        if (!selectedTagFilters.size) return;
+        selectedTagFilters = new Set();
+        renderTagFilterOptions();
+        await persistFilters();
+        renderList();
+      }
     });
-
-    const clearBtn = document.createElement("button");
-    clearBtn.type = "button";
-    clearBtn.className = "tag-clear-btn";
-    clearBtn.textContent = "Limpar tags";
-    clearBtn.disabled = selectedTagFilters.size === 0;
-    clearBtn.addEventListener("click", async () => {
-      if (!selectedTagFilters.size) return;
-      selectedTagFilters = new Set();
-      renderTagFilterOptions();
-      await persistFilters();
-      renderList();
-    });
-    refs.tagFilterOptions.appendChild(clearBtn);
   }
 
   function syncTagFilterVisibility() {
@@ -369,7 +263,6 @@ function useClipCrud() {
     visibleItems.forEach((item) => {
       const clipEl = document.createElement("article");
       clipEl.className = "clip";
-      const enableDragAndDrop = true;
       clipEl.setAttribute("draggable", "true");
       clipEl.dataset.clipId = item.id;
 
@@ -465,73 +358,15 @@ function useClipCrud() {
       metaEl.append(dateEl, actionsEl);
       clipEl.append(metaEl);
 
-      if (enableDragAndDrop) {
-        clipEl.addEventListener("dragstart", (event) => {
-          dragSourceId = item.id;
-          event.dataTransfer.effectAllowed = "move";
-          event.dataTransfer.setData("text/plain", item.id);
-          clipEl.classList.add("dragging");
-          refs.clipList.classList.add("dragging-list");
-        });
-
-        clipEl.addEventListener("dragend", () => {
-          clipEl.classList.remove("dragging");
-          dragSourceId = null;
-          refs.clipList.classList.remove("dragging-list");
-          document.querySelectorAll(".clip.drag-over").forEach((el) => {
-            el.classList.remove("drag-over");
-          });
-        });
-
-        clipEl.addEventListener("dragenter", (event) => {
-          event.preventDefault();
-          if (dragOverTimer) {
-            clearTimeout(dragOverTimer);
-            dragOverTimer = null;
-          }
-          clipEl.classList.add("drag-over");
-        });
-
-        clipEl.addEventListener("dragover", (event) => {
-          event.preventDefault();
-          event.dataTransfer.dropEffect = "move";
-          clipEl.classList.add("drag-over");
-        });
-
-        clipEl.addEventListener("dragleave", () => {
-          if (dragOverTimer) clearTimeout(dragOverTimer);
-          dragOverTimer = setTimeout(() => {
-            clipEl.classList.remove("drag-over");
-          }, 60);
-        });
-
-        clipEl.addEventListener("drop", async (event) => {
-          event.preventDefault();
-          clipEl.classList.remove("drag-over");
-          const sourceId = dragSourceId || event.dataTransfer.getData("text/plain");
-          const targetId = item.id;
-          if (!sourceId || sourceId === targetId) return;
-
-          const reordered = await reorderItems(sourceId, targetId);
-          await storage.set(reordered);
-          renderList();
-        });
-      }
+      dndManager.bindClipDragHandlers({
+        clipEl,
+        itemId: item.id,
+        clipList: refs.clipList,
+        onReordered: renderList
+      });
 
       refs.clipList.appendChild(clipEl);
     });
-  }
-
-  async function reorderItems(sourceId, targetId) {
-    const items = await storage.get();
-    const sourceIndex = items.findIndex((item) => item.id === sourceId);
-    const targetIndex = items.findIndex((item) => item.id === targetId);
-    if (sourceIndex === -1 || targetIndex === -1) return items;
-
-    const updated = [...items];
-    const [moved] = updated.splice(sourceIndex, 1);
-    updated.splice(targetIndex, 0, moved);
-    return updated;
   }
 
   async function addClip() {
