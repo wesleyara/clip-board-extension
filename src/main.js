@@ -12,6 +12,11 @@ const composer = document.getElementById("composer");
 const fabAdd = document.getElementById("fabAdd");
 const searchInput = document.getElementById("searchInput");
 const filterSelect = document.getElementById("filterSelect");
+const tagMatchSelect = document.getElementById("tagMatchSelect");
+const tagFilterOptions = document.getElementById("tagFilterOptions");
+const tagInput = document.getElementById("tagInput");
+const addTagBtn = document.getElementById("addTagBtn");
+const tagOptions = document.getElementById("tagOptions");
 
 window.clipCrud.init({
   clipInput,
@@ -19,7 +24,14 @@ window.clipCrud.init({
   cancelBtn,
   clipList,
   emptyState,
-  composer
+  composer,
+  searchInput,
+  filterSelect,
+  tagMatchSelect,
+  tagFilterOptions,
+  tagInput,
+  addTagBtn,
+  tagOptions
 });
 
 window.clipImportExport.init({
@@ -55,6 +67,10 @@ searchInput.addEventListener("input", (event) => {
 
 filterSelect.addEventListener("change", (event) => {
   window.clipCrud.setFilters({ filterMode: event.target.value });
+});
+
+tagMatchSelect.addEventListener("change", (event) => {
+  window.clipCrud.setFilters({ tagFilterMatchMode: event.target.value });
 });
 
 menuDropdown.setAttribute("hidden", "");

@@ -1,13 +1,15 @@
 # Clip Board
 
-Browser extension to save, organize, and quickly copy custom text snippets. It uses the browser’s local storage and includes search, favorites, most-copied ordering, and JSON import/export.
+Browser extension to save, organize, and quickly copy custom text snippets. It uses the browser’s local storage and includes search, favorites, tags, and JSON import/export.
 
 ## ✨ Features
 
 - Save and edit text clips.
-- Copy with one click and track copy counts.
+- Create tags and associate them when saving clips.
+- Remove tags globally (with confirmation), including from associated clips.
+- Copy with one click.
 - Favorite important clips.
-- Search and filters (all, favorites, most copied).
+- Search and filters (all, favorites, and multi-tag with any/all match).
 - Drag-and-drop reordering.
 - JSON import and export.
 
@@ -21,6 +23,7 @@ Browser extension to save, organize, and quickly copy custom text snippets. It u
 ## 🧭 Usage
 
 - Click the **+** button to create a new clip.
+- In the composer, add tags and select the ones to associate with the clip.
 - Use **Ctrl+Enter** (or **Cmd+Enter**) to save quickly while typing.
 - Use the **⋮** menu to **Export** or **Import**.
 - Use the search field and filter to find clips.
