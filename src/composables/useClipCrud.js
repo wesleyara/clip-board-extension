@@ -1,13 +1,209 @@
 function useClipCrud() {
-  const { storage, showStatus, formatDate, createId, normalizeContent } =
+  const { storage, uiStateStorage, showStatus, formatDate, createId, normalizeContent } =
     window.clipBoardCore;
+  const tagManager = window.createClipTagManager({ storage, showStatus });
+  const dndManager = window.createClipDnDManager({ storage });
 
   let refs = null;
   let editingId = null;
-  let dragSourceId = null;
-  let dragOverTimer = null;
   let searchTerm = "";
   let filterMode = "all";
+  let selectedTagFilters = new Set();
+  let tagFilterMatchMode = "any";
+  let selectedTags = new Set();
+  let availableTags = [];
+
+  function normalizeTagFilterMatchMode(mode) {
+    return mode === "all" ? "all" : "any";
+  }
+
+  function normalizeFilterMode(mode) {
+    return ["all", "favorites", "tag"].includes(mode) ? mode : "all";
+  }
+
+  async function persistFilters() {
+    await uiStateStorage.set({
+      searchTerm,
+      filterMode,
+      tagFilters: Array.from(selectedTagFilters),
+      tagFilterMatchMode
+    });
+  }
+
+  async function restoreFilters() {
+    const saved = await uiStateStorage.get();
+    if (!saved || typeof saved !== "object") return;
+
+    if (typeof saved.searchTerm === "string") {
+      searchTerm = saved.searchTerm;
+    }
+    if (typeof saved.filterMode === "string") {
+      filterMode = normalizeFilterMode(saved.filterMode);
+    }
+    if (typeof saved.tagFilterMatchMode === "string") {
+      tagFilterMatchMode = normalizeTagFilterMatchMode(saved.tagFilterMatchMode);
+    }
+    if (Array.isArray(saved.tagFilters)) {
+      selectedTagFilters = new Set(
+        saved.tagFilters
+          .map((tag) => normalizeTag(tag).toLowerCase())
+          .filter(Boolean)
+      );
+      return;
+    }
+    if (typeof saved.tagFilter === "string") {
+      const normalizedLegacyTag = normalizeTag(saved.tagFilter).toLowerCase();
+      selectedTagFilters = normalizedLegacyTag && normalizedLegacyTag !== "__all__"
+        ? new Set([normalizedLegacyTag])
+        : new Set();
+    }
+  }
+
+  function syncFilterControls() {
+    if (refs?.searchInput) {
+      refs.searchInput.value = searchTerm;
+    }
+    if (refs?.filterSelect) {
+      refs.filterSelect.value = filterMode;
+    }
+    if (refs?.tagMatchSelect) {
+      refs.tagMatchSelect.value = normalizeTagFilterMatchMode(tagFilterMatchMode);
+    }
+  }
+
+  function normalizeTag(tag) {
+    return tagManager.normalizeTag(tag);
+  }
+
+  function extractTagsFromItems(items) {
+    return tagManager.extractTagsFromItems(items);
+  }
+
+  async function refreshAvailableTags() {
+    const items = await storage.get();
+    availableTags = extractTagsFromItems(items);
+  }
+
+  function renderTagOptions() {
+    if (!refs?.tagOptions) return;
+
+    tagManager.renderTagSelection({
+      container: refs.tagOptions,
+      availableTags,
+      selectedKeys: selectedTags,
+      emptyText: "Nenhuma tag criada ainda.",
+      onToggle: (tag) => {
+        const key = tag.toLowerCase();
+        if (selectedTags.has(key)) {
+          selectedTags.delete(key);
+        } else {
+          selectedTags.add(key);
+        }
+        renderTagOptions();
+      },
+      onRemove: (tag) => {
+        removeTagEverywhere(tag);
+      }
+    });
+  }
+
+  function addTag() {
+    const normalized = normalizeTag(refs.tagInput?.value);
+
+    if (!normalized) {
+      showStatus("Digite um nome de tag para adicionar.", "error");
+      return;
+    }
+
+    const key = normalized.toLowerCase();
+    const existingIndex = availableTags.findIndex(
+      (tag) => tag.toLowerCase() === key
+    );
+
+    if (existingIndex === -1) {
+      availableTags.push(normalized);
+      availableTags.sort((a, b) =>
+        a.localeCompare(b, "pt-BR", { sensitivity: "base" })
+      );
+    }
+
+    selectedTags.add(key);
+    refs.tagInput.value = "";
+    renderTagOptions();
+  }
+
+  function getSelectedTagValues() {
+    return availableTags.filter((tag) => selectedTags.has(tag.toLowerCase()));
+  }
+
+  async function removeTagEverywhere(tag) {
+    await tagManager.removeTagEverywhere(tag, {
+      onAfterRemove: async ({ updatedItems, removedKey }) => {
+        selectedTags.delete(removedKey);
+        selectedTagFilters.delete(removedKey);
+        availableTags = extractTagsFromItems(updatedItems);
+
+        await persistFilters();
+        renderTagOptions();
+        renderTagFilterOptions();
+        syncTagFilterVisibility();
+        renderList();
+      }
+    });
+  }
+
+  function renderTagFilterOptions() {
+    if (!refs?.tagFilterOptions) return;
+
+    const validKeys = new Set(availableTags.map((tag) => tag.toLowerCase()));
+    selectedTagFilters = new Set(
+      Array.from(selectedTagFilters).filter((key) => validKeys.has(key))
+    );
+
+    tagManager.renderTagFilterSelection({
+      container: refs.tagFilterOptions,
+      availableTags,
+      selectedKeys: selectedTagFilters,
+      emptyText: "Nenhuma tag disponível para filtrar.",
+      clearDisabled: selectedTagFilters.size === 0,
+      onToggle: async (tag) => {
+        const key = tag.toLowerCase();
+        if (selectedTagFilters.has(key)) {
+          selectedTagFilters.delete(key);
+        } else {
+          selectedTagFilters.add(key);
+        }
+        renderTagFilterOptions();
+        await persistFilters();
+        renderList();
+      },
+      onRemove: (tag) => {
+        removeTagEverywhere(tag);
+      },
+      onClear: async () => {
+        if (!selectedTagFilters.size) return;
+        selectedTagFilters = new Set();
+        renderTagFilterOptions();
+        await persistFilters();
+        renderList();
+      }
+    });
+  }
+
+  function syncTagFilterVisibility() {
+    if (!refs?.tagFilterOptions) return;
+    if (filterMode === "tag") {
+      if (refs?.tagMatchSelect) {
+        refs.tagMatchSelect.removeAttribute("hidden");
+      }
+      refs.tagFilterOptions.removeAttribute("hidden");
+      return;
+    }
+    if (refs?.tagMatchSelect) {
+      refs.tagMatchSelect.setAttribute("hidden", "");
+    }
+    refs.tagFilterOptions.setAttribute("hidden", "");
+  }
 
   function applyFilters(items) {
     let filtered = items;
@@ -23,11 +219,15 @@ function useClipCrud() {
       filtered = filtered.filter((item) => item.favorite);
     }
 
-    if (filterMode === "mostCopied") {
-      filtered = filtered.filter((item) => (item.copyCount || 0) > 0);
-      filtered = filtered
-        .slice()
-        .sort((a, b) => (b.copyCount || 0) - (a.copyCount || 0));
+    if (filterMode === "tag" && selectedTagFilters.size) {
+      filtered = filtered.filter((item) => {
+        const tags = Array.isArray(item.tags) ? item.tags : [];
+        const itemTagKeys = new Set(tags.map((tag) => normalizeTag(tag).toLowerCase()));
+        if (tagFilterMatchMode === "all") {
+          return Array.from(selectedTagFilters).every((key) => itemTagKeys.has(key));
+        }
+        return Array.from(selectedTagFilters).some((key) => itemTagKeys.has(key));
+      });
     }
 
     return filtered;
@@ -35,6 +235,12 @@ function useClipCrud() {
 
   async function renderList() {
     const items = await storage.get();
+    availableTags = extractTagsFromItems(items);
+    renderTagFilterOptions();
+    syncTagFilterVisibility();
+    if (refs && !refs.composer.hidden) {
+      renderTagOptions();
+    }
     const visibleItems = applyFilters(items);
     refs.clipList.innerHTML = "";
 
@@ -57,13 +263,28 @@ function useClipCrud() {
     visibleItems.forEach((item) => {
       const clipEl = document.createElement("article");
       clipEl.className = "clip";
-      const enableDragAndDrop = filterMode !== "mostCopied";
-      clipEl.setAttribute("draggable", String(enableDragAndDrop));
+      clipEl.setAttribute("draggable", "true");
       clipEl.dataset.clipId = item.id;
 
       const contentEl = document.createElement("div");
       contentEl.className = "clip-content";
       contentEl.textContent = item.content;
+
+      if (Array.isArray(item.tags) && item.tags.length) {
+        const tagsEl = document.createElement("div");
+        tagsEl.className = "clip-tags";
+
+        item.tags.forEach((tag) => {
+          const tagEl = document.createElement("span");
+          tagEl.className = "clip-tag";
+          tagEl.textContent = tag;
+          tagsEl.appendChild(tagEl);
+        });
+
+        clipEl.append(contentEl, tagsEl);
+      } else {
+        clipEl.appendChild(contentEl);
+      }
 
       const metaEl = document.createElement("div");
       metaEl.className = "clip-meta";
@@ -96,8 +317,14 @@ function useClipCrud() {
       editBtn.addEventListener("click", () => {
         editingId = item.id;
         refs.clipInput.value = item.content;
+        selectedTags = new Set(
+          (Array.isArray(item.tags) ? item.tags : []).map((tag) =>
+            normalizeTag(tag).toLowerCase()
+          )
+        );
         refs.addBtn.textContent = "Salvar";
         refs.composer.hidden = false;
+        renderTagOptions();
         refs.clipInput.focus();
       });
 
@@ -107,15 +334,6 @@ function useClipCrud() {
       copyBtn.addEventListener("click", async () => {
         try {
           await navigator.clipboard.writeText(item.content);
-          const updated = (await storage.get()).map((clip) =>
-            clip.id === item.id
-              ? { ...clip, copyCount: (clip.copyCount || 0) + 1 }
-              : clip
-          );
-          await storage.set(updated);
-          if (filterMode === "mostCopied") {
-            renderList();
-          }
           showStatus("Texto copiado!", "success");
         } catch (error) {
           showStatus("Não foi possível copiar.", "error");
@@ -138,80 +356,23 @@ function useClipCrud() {
 
       actionsEl.append(favoriteBtn, copyBtn, editBtn, removeBtn);
       metaEl.append(dateEl, actionsEl);
-      clipEl.append(contentEl, metaEl);
+      clipEl.append(metaEl);
 
-      if (enableDragAndDrop) {
-        clipEl.addEventListener("dragstart", (event) => {
-          dragSourceId = item.id;
-          event.dataTransfer.effectAllowed = "move";
-          event.dataTransfer.setData("text/plain", item.id);
-          clipEl.classList.add("dragging");
-          refs.clipList.classList.add("dragging-list");
-        });
-
-        clipEl.addEventListener("dragend", () => {
-          clipEl.classList.remove("dragging");
-          dragSourceId = null;
-          refs.clipList.classList.remove("dragging-list");
-          document.querySelectorAll(".clip.drag-over").forEach((el) => {
-            el.classList.remove("drag-over");
-          });
-        });
-
-        clipEl.addEventListener("dragenter", (event) => {
-          event.preventDefault();
-          if (dragOverTimer) {
-            clearTimeout(dragOverTimer);
-            dragOverTimer = null;
-          }
-          clipEl.classList.add("drag-over");
-        });
-
-        clipEl.addEventListener("dragover", (event) => {
-          event.preventDefault();
-          event.dataTransfer.dropEffect = "move";
-          clipEl.classList.add("drag-over");
-        });
-
-        clipEl.addEventListener("dragleave", () => {
-          if (dragOverTimer) clearTimeout(dragOverTimer);
-          dragOverTimer = setTimeout(() => {
-            clipEl.classList.remove("drag-over");
-          }, 60);
-        });
-
-        clipEl.addEventListener("drop", async (event) => {
-          event.preventDefault();
-          clipEl.classList.remove("drag-over");
-          const sourceId = dragSourceId || event.dataTransfer.getData("text/plain");
-          const targetId = item.id;
-          if (!sourceId || sourceId === targetId) return;
-
-          const reordered = await reorderItems(sourceId, targetId);
-          await storage.set(reordered);
-          renderList();
-        });
-      }
+      dndManager.bindClipDragHandlers({
+        clipEl,
+        itemId: item.id,
+        clipList: refs.clipList,
+        onReordered: renderList
+      });
 
       refs.clipList.appendChild(clipEl);
     });
   }
 
-  async function reorderItems(sourceId, targetId) {
-    const items = await storage.get();
-    const sourceIndex = items.findIndex((item) => item.id === sourceId);
-    const targetIndex = items.findIndex((item) => item.id === targetId);
-    if (sourceIndex === -1 || targetIndex === -1) return items;
-
-    const updated = [...items];
-    const [moved] = updated.splice(sourceIndex, 1);
-    updated.splice(targetIndex, 0, moved);
-    return updated;
-  }
-
   async function addClip() {
     const rawContent = refs.clipInput.value;
     const content = rawContent.trim();
+    const tags = getSelectedTagValues();
     if (!content) {
       showStatus("Digite algum texto antes de adicionar.", "error");
       return;
@@ -230,10 +391,11 @@ function useClipCrud() {
 
       const updated = items.map((item) =>
         item.id === editingId
-          ? { ...item, content, updatedAt: new Date().toISOString() }
+          ? { ...item, content, tags, updatedAt: new Date().toISOString() }
           : item
       );
       await storage.set(updated);
+      availableTags = extractTagsFromItems(updated);
       showStatus("Clip atualizado!", "success");
     } else {
       const exists = items.some((item) => normalizeContent(item.content) === normalized);
@@ -245,48 +407,83 @@ function useClipCrud() {
       const newItem = {
         id: createId(),
         content,
+        tags,
         createdAt: new Date().toISOString(),
-        favorite: false,
-        copyCount: 0
+        favorite: false
       };
 
       items.unshift(newItem);
       await storage.set(items);
+      availableTags = extractTagsFromItems(items);
       showStatus("Clip salvo!", "success");
     }
 
     refs.clipInput.value = "";
+    refs.tagInput.value = "";
+    selectedTags = new Set();
     editingId = null;
     refs.addBtn.textContent = "Salvar";
     refs.composer.hidden = true;
+    renderTagOptions();
     renderList();
   }
 
-  function openComposerForNew() {
+  async function openComposerForNew() {
     editingId = null;
     refs.clipInput.value = "";
+    refs.tagInput.value = "";
+    selectedTags = new Set();
+    await refreshAvailableTags();
+    renderTagOptions();
     refs.addBtn.textContent = "Salvar";
     refs.composer.hidden = false;
     refs.clipInput.focus();
   }
 
-  function setFilters({ search, filterMode: filterModeNext }) {
+  async function setFilters({ search, filterMode: filterModeNext, tagFilter: tagFilterNext, tagFilters, tagFilterMatchMode: tagFilterMatchModeNext }) {
     if (typeof search === "string") {
       searchTerm = search.trim();
     }
     if (typeof filterModeNext === "string") {
-      filterMode = filterModeNext;
+      filterMode = normalizeFilterMode(filterModeNext);
     }
+    if (Array.isArray(tagFilters)) {
+      selectedTagFilters = new Set(
+        tagFilters.map((tag) => normalizeTag(tag).toLowerCase()).filter(Boolean)
+      );
+    }
+    if (typeof tagFilterNext === "string") {
+      const normalizedLegacyTag = normalizeTag(tagFilterNext).toLowerCase();
+      selectedTagFilters = normalizedLegacyTag && normalizedLegacyTag !== "__all__"
+        ? new Set([normalizedLegacyTag])
+        : new Set();
+    }
+    if (typeof tagFilterMatchModeNext === "string") {
+      tagFilterMatchMode = normalizeTagFilterMatchMode(tagFilterMatchModeNext);
+    }
+    syncTagFilterVisibility();
+    syncFilterControls();
+    await persistFilters();
     renderList();
   }
 
   function bindEvents() {
     refs.addBtn.addEventListener("click", addClip);
+    refs.addTagBtn.addEventListener("click", addTag);
     refs.cancelBtn.addEventListener("click", () => {
       refs.clipInput.value = "";
+      refs.tagInput.value = "";
+      selectedTags = new Set();
+      renderTagOptions();
       editingId = null;
       refs.composer.hidden = true;
       refs.addBtn.textContent = "Salvar";
+    });
+    refs.tagInput.addEventListener("keydown", (event) => {
+      if (event.key === "Enter") {
+        event.preventDefault();
+        addTag();
+      }
     });
     refs.clipInput.addEventListener("keydown", (event) => {
       if (event.key === "Enter" && (event.ctrlKey || event.metaKey)) {
@@ -295,8 +492,14 @@ function useClipCrud() {
     });
   }
 
-  function init(domRefs) {
+  async function init(domRefs) {
     refs = domRefs;
+    await restoreFilters();
+    await refreshAvailableTags();
+    renderTagOptions();
+    renderTagFilterOptions();
+    syncTagFilterVisibility();
+    syncFilterControls();
     bindEvents();
     renderList();
   }

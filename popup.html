@@ -40,6 +40,20 @@
           placeholder="Digite um texto para salvar..."
           rows="3"
         ></textarea>
+        <div class="tag-tools">
+          <label class="label" for="tagInput">Tags</label>
+          <div class="tag-create-row">
+            <input
+              id="tagInput"
+              class="input"
+              type="text"
+              placeholder="Criar nova tag"
+              aria-label="Criar nova tag"
+            />
+            <button id="addTagBtn" class="btn ghost" type="button">Adicionar</button>
+          </div>
+          <div id="tagOptions" class="tag-options" aria-label="Selecionar tags"></div>
+        </div>
         <div class="actions minimal">
           <button id="addBtn" class="btn primary">Salvar</button>
           <button id="cancelBtn" class="btn ghost">Cancelar</button>
@@ -59,8 +73,23 @@
         <select id="filterSelect" class="select" aria-label="Filtrar clips">
           <option value="all">Todos</option>
           <option value="favorites">Favoritos</option>
-          <option value="mostCopied">Mais copiados</option>
+          <option value="tag">Por tag</option>
         </select>
+        <select
+          id="tagMatchSelect"
+          class="select"
+          aria-label="Modo de filtro por tags"
+          hidden
+        >
+          <option value="any">Contém uma tag</option>
+          <option value="all">Contém todas tags</option>
+        </select>
+        <div
+          id="tagFilterOptions"
+          class="tag-options tag-filter-options"
+          aria-label="Filtrar por tags"
+          hidden
+        ></div>
       </section>
 
       <section class="list" id="clipList">
@@ -73,6 +102,8 @@
     </main>
 
     <script src="src/composables/useCore.js"></script>
+    <script src="src/composables/useClipTagManager.js"></script>
+    <script src="src/composables/useClipDnDManager.js"></script>
     <script src="src/composables/useClipCrud.js"></script>
     <script src="src/composables/useClipImportExport.js"></script>
     <script src="src/main.js"></script>

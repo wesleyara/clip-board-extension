@@ -8,10 +8,27 @@ function useClipImportExport() {
     return items.map((item) => ({
       id: item.id,
       content: item.content,
+      tags: Array.isArray(item.tags) ? item.tags : [],
       createdAt: item.createdAt,
-      favorite: Boolean(item.favorite),
-      copyCount: Number(item.copyCount || 0)
+      favorite: Boolean(item.favorite)
     }));
+  }
+
+  function normalizeTags(tags) {
+    if (!Array.isArray(tags)) return [];
+
+    const byKey = new Map();
+    tags.forEach((tag) => {
+      if (typeof tag !== "string") return;
+      const normalized = tag.trim().replace(/\s+/g, " ");
+      if (!normalized) return;
+      const key = normalized.toLowerCase();
+      if (!byKey.has(key)) {
+        byKey.set(key, normalized);
+      }
+    });
+
+    return Array.from(byKey.values());
   }
 
   async function exportClips() {
@@ -41,9 +58,16 @@ function useClipImportExport() {
       const hasCreatedAt = typeof item.createdAt === "string" && item.createdAt.trim();
       const hasValidFavorite =
         item.favorite === undefined || typeof item.favorite === "boolean";
-      const hasValidCopyCount =
-        item.copyCount === undefined || Number.isFinite(item.copyCount);
-      return hasContent && hasId && hasCreatedAt && hasValidFavorite && hasValidCopyCount;
+      const hasValidTags =
+        item.tags === undefined ||
+        (Array.isArray(item.tags) && item.tags.every((tag) => typeof tag === "string"));
+      return (
+        hasContent &&
+        hasId &&
+        hasCreatedAt &&
+        hasValidFavorite &&
+        hasValidTags
+      );
     });
   }
 
@@ -75,9 +99,9 @@ function useClipImportExport() {
         merged.push({
           id: item.id,
           content: item.content.trim(),
+          tags: normalizeTags(item.tags),
           createdAt: item.createdAt,
-          favorite: Boolean(item.favorite),
-          copyCount: Number(item.copyCount || 0)
+          favorite: Boolean(item.favorite)
         });
         contentSet.add(normalized);
         idSet.add(item.id);

@@ -1,4 +1,5 @@
 const STORAGE_KEY = "clipBoardItems";
+const UI_STATE_KEY = "clipBoardUiState";
 
 const statusEl = document.getElementById("status");
 
@@ -17,6 +18,24 @@ const storage = {
       return;
     }
     localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
+  }
+};
+
+const uiStateStorage = {
+  async get() {
+    if (chrome?.storage?.local) {
+      const result = await chrome.storage.local.get(UI_STATE_KEY);
+      return result[UI_STATE_KEY] || {};
+    }
+    const raw = localStorage.getItem(UI_STATE_KEY);
+    return raw ? JSON.parse(raw) : {};
+  },
+  async set(state) {
+    if (chrome?.storage?.local) {
+      await chrome.storage.local.set({ [UI_STATE_KEY]: state });
+      return;
+    }
+    localStorage.setItem(UI_STATE_KEY, JSON.stringify(state));
   }
 };
 
@@ -54,6 +73,7 @@ function normalizeContent(content) {
 
 window.clipBoardCore = {
   storage,
+  uiStateStorage,
   showStatus,
   formatDate,
   createId,
