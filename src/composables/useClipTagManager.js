@@ -28,6 +28,7 @@ function useClipTagManager({ storage, showStatus }) {
     selectedKeys,
     onToggle,
     onRemove,
+    showRemove = true,
     emptyText
   }) {
     if (!container) return;
@@ -58,18 +59,21 @@ function useClipTagManager({ storage, showStatus }) {
       tagBtn.textContent = tag;
       tagBtn.addEventListener("click", () => onToggle(tag));
 
-      const removeBtn = document.createElement("button");
-      removeBtn.type = "button";
-      removeBtn.className = "tag-chip-remove";
-      removeBtn.textContent = "×";
-      removeBtn.title = `Remover tag ${tag}`;
-      removeBtn.setAttribute("aria-label", `Remover tag ${tag}`);
-      removeBtn.addEventListener("click", (event) => {
-        event.stopPropagation();
-        onRemove(tag);
-      });
-
-      tagWrap.append(tagBtn, removeBtn);
+      if (showRemove && typeof onRemove === "function") {
+        const removeBtn = document.createElement("button");
+        removeBtn.type = "button";
+        removeBtn.className = "tag-chip-remove";
+        removeBtn.textContent = "×";
+        removeBtn.title = `Remover tag ${tag}`;
+        removeBtn.setAttribute("aria-label", `Remover tag ${tag}`);
+        removeBtn.addEventListener("click", (event) => {
+          event.stopPropagation();
+          onRemove(tag);
+        });
+        tagWrap.append(tagBtn, removeBtn);
+      } else {
+        tagWrap.appendChild(tagBtn);
+      }
       container.appendChild(tagWrap);
     });
   }
@@ -79,7 +83,6 @@ function useClipTagManager({ storage, showStatus }) {
     availableTags,
     selectedKeys,
     onToggle,
-    onRemove,
     onClear,
     clearDisabled,
     emptyText
@@ -89,7 +92,7 @@ function useClipTagManager({ storage, showStatus }) {
       availableTags,
       selectedKeys,
       onToggle,
-      onRemove,
+      showRemove: false,
       emptyText
     });
 

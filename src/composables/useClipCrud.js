@@ -177,9 +177,6 @@ function useClipCrud() {
         await persistFilters();
         renderList();
       },
-      onRemove: (tag) => {
-        removeTagEverywhere(tag);
-      },
       onClear: async () => {
         if (!selectedTagFilters.size) return;
         selectedTagFilters = new Set();
