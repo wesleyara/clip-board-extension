@@ -1,5 +1,5 @@
 function useClipCrud() {
-  const { storage, showStatus, formatDate, createId, normalizeContent } =
+  const { storage, uiStateStorage, showStatus, formatDate, createId, normalizeContent } =
     window.clipBoardCore;
 
   let refs = null;
@@ -8,6 +8,233 @@ function useClipCrud() {
   let dragOverTimer = null;
   let searchTerm = "";
   let filterMode = "all";
+  let selectedTagFilters = new Set();
+  let tagFilterMatchMode = "any";
+  let selectedTags = new Set();
+  let availableTags = [];
+
+  function normalizeTagFilterMatchMode(mode) {
+    return mode === "all" ? "all" : "any";
+  }
+
+  async function persistFilters() {
+    await uiStateStorage.set({
+      searchTerm,
+      filterMode,
+      tagFilters: Array.from(selectedTagFilters),
+      tagFilterMatchMode
+    });
+  }
+
+  async function restoreFilters() {
+    const saved = await uiStateStorage.get();
+    if (!saved || typeof saved !== "object") return;
+
+    if (typeof saved.searchTerm === "string") {
+      searchTerm = saved.searchTerm;
+    }
+    if (typeof saved.filterMode === "string") {
+      filterMode = saved.filterMode;
+    }
+    if (typeof saved.tagFilterMatchMode === "string") {
+      tagFilterMatchMode = normalizeTagFilterMatchMode(saved.tagFilterMatchMode);
+    }
+    if (Array.isArray(saved.tagFilters)) {
+      selectedTagFilters = new Set(
+        saved.tagFilters
+          .map((tag) => normalizeTag(tag).toLowerCase())
+          .filter(Boolean)
+      );
+      return;
+    }
+    if (typeof saved.tagFilter === "string") {
+      const normalizedLegacyTag = normalizeTag(saved.tagFilter).toLowerCase();
+      selectedTagFilters = normalizedLegacyTag && normalizedLegacyTag !== "__all__"
+        ? new Set([normalizedLegacyTag])
+        : new Set();
+    }
+  }
+
+  function syncFilterControls() {
+    if (refs?.searchInput) {
+      refs.searchInput.value = searchTerm;
+    }
+    if (refs?.filterSelect) {
+      refs.filterSelect.value = filterMode;
+    }
+    if (refs?.tagMatchSelect) {
+      refs.tagMatchSelect.value = normalizeTagFilterMatchMode(tagFilterMatchMode);
+    }
+  }
+
+  function normalizeTag(tag) {
+    return String(tag || "").trim().replace(/\s+/g, " ");
+  }
+
+  function extractTagsFromItems(items) {
+    const byKey = new Map();
+    items.forEach((item) => {
+      const tags = Array.isArray(item.tags) ? item.tags : [];
+      tags.forEach((tag) => {
+        const normalized = normalizeTag(tag);
+        if (!normalized) return;
+        const key = normalized.toLowerCase();
+        if (!byKey.has(key)) {
+          byKey.set(key, normalized);
+        }
+      });
+    });
+
+    return Array.from(byKey.values()).sort((a, b) =>
+      a.localeCompare(b, "pt-BR", { sensitivity: "base" })
+    );
+  }
+
+  async function refreshAvailableTags() {
+    const items = await storage.get();
+    availableTags = extractTagsFromItems(items);
+  }
+
+  function renderTagOptions() {
+    if (!refs?.tagOptions) return;
+
+    refs.tagOptions.innerHTML = "";
+
+    if (!availableTags.length) {
+      const emptyTags = document.createElement("span");
+      emptyTags.className = "tag-empty";
+      emptyTags.textContent = "Nenhuma tag criada ainda.";
+      refs.tagOptions.appendChild(emptyTags);
+      return;
+    }
+
+    availableTags.forEach((tag) => {
+      const tagBtn = document.createElement("button");
+      tagBtn.type = "button";
+      tagBtn.className = "tag-chip";
+      const isSelected = selectedTags.has(tag.toLowerCase());
+      if (isSelected) {
+        tagBtn.classList.add("selected");
+      }
+      tagBtn.setAttribute("aria-pressed", String(isSelected));
+      tagBtn.textContent = tag;
+
+      tagBtn.addEventListener("click", () => {
+        const key = tag.toLowerCase();
+        if (selectedTags.has(key)) {
+          selectedTags.delete(key);
+        } else {
+          selectedTags.add(key);
+        }
+        renderTagOptions();
+      });
+
+      refs.tagOptions.appendChild(tagBtn);
+    });
+  }
+
+  function addTag() {
+    const normalized = normalizeTag(refs.tagInput?.value);
+
+    if (!normalized) {
+      showStatus("Digite um nome de tag para adicionar.", "error");
+      return;
+    }
+
+    const key = normalized.toLowerCase();
+    const existingIndex = availableTags.findIndex(
+      (tag) => tag.toLowerCase() === key
+    );
+
+    if (existingIndex === -1) {
+      availableTags.push(normalized);
+      availableTags.sort((a, b) =>
+        a.localeCompare(b, "pt-BR", { sensitivity: "base" })
+      );
+    }
+
+    selectedTags.add(key);
+    refs.tagInput.value = "";
+    renderTagOptions();
+  }
+
+  function getSelectedTagValues() {
+    return availableTags.filter((tag) => selectedTags.has(tag.toLowerCase()));
+  }
+
+  function renderTagFilterOptions() {
+    if (!refs?.tagFilterOptions) return;
+
+    refs.tagFilterOptions.innerHTML = "";
+
+    const validKeys = new Set(availableTags.map((tag) => tag.toLowerCase()));
+    selectedTagFilters = new Set(
+      Array.from(selectedTagFilters).filter((key) => validKeys.has(key))
+    );
+
+    if (!availableTags.length) {
+      const emptyTags = document.createElement("span");
+      emptyTags.className = "tag-empty";
+      emptyTags.textContent = "Nenhuma tag disponível para filtrar.";
+      refs.tagFilterOptions.appendChild(emptyTags);
+      return;
+    }
+
+    availableTags.forEach((tag) => {
+      const key = tag.toLowerCase();
+      const tagBtn = document.createElement("button");
+      tagBtn.type = "button";
+      tagBtn.className = "tag-chip";
+      const isSelected = selectedTagFilters.has(key);
+      if (isSelected) {
+        tagBtn.classList.add("selected");
+      }
+      tagBtn.setAttribute("aria-pressed", String(isSelected));
+      tagBtn.textContent = tag;
+
+      tagBtn.addEventListener("click", async () => {
+        if (selectedTagFilters.has(key)) {
+          selectedTagFilters.delete(key);
+        } else {
+          selectedTagFilters.add(key);
+        }
+        renderTagFilterOptions();
+        await persistFilters();
+        renderList();
+      });
+
+      refs.tagFilterOptions.appendChild(tagBtn);
+    });
+
+    const clearBtn = document.createElement("button");
+    clearBtn.type = "button";
+    clearBtn.className = "tag-clear-btn";
+    clearBtn.textContent = "Limpar tags";
+    clearBtn.disabled = selectedTagFilters.size === 0;
+    clearBtn.addEventListener("click", async () => {
+      if (!selectedTagFilters.size) return;
+      selectedTagFilters = new Set();
+      renderTagFilterOptions();
+      await persistFilters();
+      renderList();
+    });
+    refs.tagFilterOptions.appendChild(clearBtn);
+  }
+
+  function syncTagFilterVisibility() {
+    if (!refs?.tagFilterOptions) return;
+    if (filterMode === "tag") {
+      if (refs?.tagMatchSelect) {
+        refs.tagMatchSelect.removeAttribute("hidden");
+      }
+      refs.tagFilterOptions.removeAttribute("hidden");
+      return;
+    }
+    if (refs?.tagMatchSelect) {
+      refs.tagMatchSelect.setAttribute("hidden", "");
+    }
+    refs.tagFilterOptions.setAttribute("hidden", "");
+  }
 
   function applyFilters(items) {
     let filtered = items;
@@ -30,11 +257,28 @@ function useClipCrud() {
         .sort((a, b) => (b.copyCount || 0) - (a.copyCount || 0));
     }
 
+    if (filterMode === "tag" && selectedTagFilters.size) {
+      filtered = filtered.filter((item) => {
+        const tags = Array.isArray(item.tags) ? item.tags : [];
+        const itemTagKeys = new Set(tags.map((tag) => normalizeTag(tag).toLowerCase()));
+        if (tagFilterMatchMode === "all") {
+          return Array.from(selectedTagFilters).every((key) => itemTagKeys.has(key));
+        }
+        return Array.from(selectedTagFilters).some((key) => itemTagKeys.has(key));
+      });
+    }
+
     return filtered;
   }
 
   async function renderList() {
     const items = await storage.get();
+    availableTags = extractTagsFromItems(items);
+    renderTagFilterOptions();
+    syncTagFilterVisibility();
+    if (refs && !refs.composer.hidden) {
+      renderTagOptions();
+    }
     const visibleItems = applyFilters(items);
     refs.clipList.innerHTML = "";
 
@@ -64,6 +308,22 @@ function useClipCrud() {
       const contentEl = document.createElement("div");
       contentEl.className = "clip-content";
       contentEl.textContent = item.content;
+
+      if (Array.isArray(item.tags) && item.tags.length) {
+        const tagsEl = document.createElement("div");
+        tagsEl.className = "clip-tags";
+
+        item.tags.forEach((tag) => {
+          const tagEl = document.createElement("span");
+          tagEl.className = "clip-tag";
+          tagEl.textContent = tag;
+          tagsEl.appendChild(tagEl);
+        });
+
+        clipEl.append(contentEl, tagsEl);
+      } else {
+        clipEl.appendChild(contentEl);
+      }
 
       const metaEl = document.createElement("div");
       metaEl.className = "clip-meta";
@@ -96,8 +356,14 @@ function useClipCrud() {
       editBtn.addEventListener("click", () => {
         editingId = item.id;
         refs.clipInput.value = item.content;
+        selectedTags = new Set(
+          (Array.isArray(item.tags) ? item.tags : []).map((tag) =>
+            normalizeTag(tag).toLowerCase()
+          )
+        );
         refs.addBtn.textContent = "Salvar";
         refs.composer.hidden = false;
+        renderTagOptions();
         refs.clipInput.focus();
       });
 
@@ -138,7 +404,7 @@ function useClipCrud() {
 
       actionsEl.append(favoriteBtn, copyBtn, editBtn, removeBtn);
       metaEl.append(dateEl, actionsEl);
-      clipEl.append(contentEl, metaEl);
+      clipEl.append(metaEl);
 
       if (enableDragAndDrop) {
         clipEl.addEventListener("dragstart", (event) => {
@@ -212,6 +478,7 @@ function useClipCrud() {
   async function addClip() {
     const rawContent = refs.clipInput.value;
     const content = rawContent.trim();
+    const tags = getSelectedTagValues();
     if (!content) {
       showStatus("Digite algum texto antes de adicionar.", "error");
       return;
@@ -230,10 +497,11 @@ function useClipCrud() {
 
       const updated = items.map((item) =>
         item.id === editingId
-          ? { ...item, content, updatedAt: new Date().toISOString() }
+          ? { ...item, content, tags, updatedAt: new Date().toISOString() }
           : item
       );
       await storage.set(updated);
+      availableTags = extractTagsFromItems(updated);
       showStatus("Clip atualizado!", "success");
     } else {
       const exists = items.some((item) => normalizeContent(item.content) === normalized);
@@ -245,6 +513,7 @@ function useClipCrud() {
       const newItem = {
         id: createId(),
         content,
+        tags,
         createdAt: new Date().toISOString(),
         favorite: false,
         copyCount: 0
@@ -252,41 +521,76 @@ function useClipCrud() {
 
       items.unshift(newItem);
       await storage.set(items);
+      availableTags = extractTagsFromItems(items);
       showStatus("Clip salvo!", "success");
     }
 
     refs.clipInput.value = "";
+    refs.tagInput.value = "";
+    selectedTags = new Set();
     editingId = null;
     refs.addBtn.textContent = "Salvar";
     refs.composer.hidden = true;
+    renderTagOptions();
     renderList();
   }
 
-  function openComposerForNew() {
+  async function openComposerForNew() {
     editingId = null;
     refs.clipInput.value = "";
+    refs.tagInput.value = "";
+    selectedTags = new Set();
+    await refreshAvailableTags();
+    renderTagOptions();
     refs.addBtn.textContent = "Salvar";
     refs.composer.hidden = false;
     refs.clipInput.focus();
   }
 
-  function setFilters({ search, filterMode: filterModeNext }) {
+  async function setFilters({ search, filterMode: filterModeNext, tagFilter: tagFilterNext, tagFilters, tagFilterMatchMode: tagFilterMatchModeNext }) {
     if (typeof search === "string") {
       searchTerm = search.trim();
     }
     if (typeof filterModeNext === "string") {
       filterMode = filterModeNext;
     }
+    if (Array.isArray(tagFilters)) {
+      selectedTagFilters = new Set(
+        tagFilters.map((tag) => normalizeTag(tag).toLowerCase()).filter(Boolean)
+      );
+    }
+    if (typeof tagFilterNext === "string") {
+      const normalizedLegacyTag = normalizeTag(tagFilterNext).toLowerCase();
+      selectedTagFilters = normalizedLegacyTag && normalizedLegacyTag !== "__all__"
+        ? new Set([normalizedLegacyTag])
+        : new Set();
+    }
+    if (typeof tagFilterMatchModeNext === "string") {
+      tagFilterMatchMode = normalizeTagFilterMatchMode(tagFilterMatchModeNext);
+    }
+    syncTagFilterVisibility();
+    syncFilterControls();
+    await persistFilters();
     renderList();
   }
 
   function bindEvents() {
     refs.addBtn.addEventListener("click", addClip);
+    refs.addTagBtn.addEventListener("click", addTag);
     refs.cancelBtn.addEventListener("click", () => {
       refs.clipInput.value = "";
+      refs.tagInput.value = "";
+      selectedTags = new Set();
+      renderTagOptions();
       editingId = null;
       refs.composer.hidden = true;
       refs.addBtn.textContent = "Salvar";
+    });
+    refs.tagInput.addEventListener("keydown", (event) => {
+      if (event.key === "Enter") {
+        event.preventDefault();
+        addTag();
+      }
     });
     refs.clipInput.addEventListener("keydown", (event) => {
       if (event.key === "Enter" && (event.ctrlKey || event.metaKey)) {
@@ -295,8 +599,14 @@ function useClipCrud() {
     });
   }
 
-  function init(domRefs) {
+  async function init(domRefs) {
     refs = domRefs;
+    await restoreFilters();
+    await refreshAvailableTags();
+    renderTagOptions();
+    renderTagFilterOptions();
+    syncTagFilterVisibility();
+    syncFilterControls();
     bindEvents();
     renderList();
   }
