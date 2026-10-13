@@ -1,5 +1,5 @@
 function useClipCrud() {
-  const { storage, uiStateStorage, showStatus, formatDate, createId, normalizeContent } =
+  const { storage, uiStateStorage, showStatus, formatDate, createId, normalizeContent, setButtonIcon } =
     window.clipBoardCore;
   const tagManager = window.createClipTagManager({ storage, showStatus });
   const dndManager = window.createClipDnDManager({ storage });
@@ -296,8 +296,11 @@ function useClipCrud() {
       favoriteBtn.className = "btn small ghost favorite-btn";
       favoriteBtn.type = "button";
       favoriteBtn.setAttribute("aria-pressed", String(Boolean(item.favorite)));
-      favoriteBtn.title = item.favorite ? "Desfavoritar" : "Favoritar";
-      favoriteBtn.textContent = item.favorite ? "★" : "☆";
+      setButtonIcon(
+        favoriteBtn,
+        "star",
+        item.favorite ? "Desfavoritar" : "Favoritar"
+      );
       favoriteBtn.addEventListener("click", async () => {
         const updated = (await storage.get()).map((clip) =>
           clip.id === item.id
@@ -310,7 +313,8 @@ function useClipCrud() {
 
       const editBtn = document.createElement("button");
       editBtn.className = "btn small ghost";
-      editBtn.textContent = "Editar";
+      editBtn.type = "button";
+      setButtonIcon(editBtn, "pencil", "Editar");
       editBtn.addEventListener("click", () => {
         editingId = item.id;
         refs.clipInput.value = item.content;
@@ -319,7 +323,7 @@ function useClipCrud() {
             normalizeTag(tag).toLowerCase()
           )
         );
-        refs.addBtn.textContent = "Salvar";
+        setButtonIcon(refs.addBtn, "check", "Salvar");
         refs.composer.hidden = false;
         renderTagOptions();
         refs.clipInput.focus();
@@ -327,7 +331,8 @@ function useClipCrud() {
 
       const copyBtn = document.createElement("button");
       copyBtn.className = "btn small";
-      copyBtn.textContent = "Copiar";
+      copyBtn.type = "button";
+      setButtonIcon(copyBtn, "copy", "Copiar");
       copyBtn.addEventListener("click", async () => {
         try {
           await navigator.clipboard.writeText(item.content);
@@ -339,7 +344,8 @@ function useClipCrud() {
 
       const removeBtn = document.createElement("button");
       removeBtn.className = "btn small danger";
-      removeBtn.textContent = "Remover";
+      removeBtn.type = "button";
+      setButtonIcon(removeBtn, "trash", "Remover");
       removeBtn.addEventListener("click", async () => {
         const confirmed = window.confirm("Remover este clip?");
         if (!confirmed) return;
@@ -419,7 +425,7 @@ function useClipCrud() {
     refs.tagInput.value = "";
     selectedTags = new Set();
     editingId = null;
-    refs.addBtn.textContent = "Salvar";
+    setButtonIcon(refs.addBtn, "check", "Salvar");
     refs.composer.hidden = true;
     renderTagOptions();
     renderList();
@@ -432,7 +438,7 @@ function useClipCrud() {
     selectedTags = new Set();
     await refreshAvailableTags();
     renderTagOptions();
-    refs.addBtn.textContent = "Salvar";
+    setButtonIcon(refs.addBtn, "check", "Salvar");
     refs.composer.hidden = false;
     refs.clipInput.focus();
   }
@@ -474,7 +480,7 @@ function useClipCrud() {
       renderTagOptions();
       editingId = null;
       refs.composer.hidden = true;
-      refs.addBtn.textContent = "Salvar";
+      setButtonIcon(refs.addBtn, "check", "Salvar");
     });
     refs.tagInput.addEventListener("keydown", (event) => {
       if (event.key === "Enter") {

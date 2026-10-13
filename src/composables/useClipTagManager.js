@@ -63,9 +63,7 @@ function useClipTagManager({ storage, showStatus }) {
         const removeBtn = document.createElement("button");
         removeBtn.type = "button";
         removeBtn.className = "tag-chip-remove";
-        removeBtn.textContent = "×";
-        removeBtn.title = `Remover tag ${tag}`;
-        removeBtn.setAttribute("aria-label", `Remover tag ${tag}`);
+        window.clipBoardCore.setButtonIcon(removeBtn, "x", `Remover tag ${tag}`);
         removeBtn.addEventListener("click", (event) => {
           event.stopPropagation();
           onRemove(tag);
@@ -101,7 +99,7 @@ function useClipTagManager({ storage, showStatus }) {
     const clearBtn = document.createElement("button");
     clearBtn.type = "button";
     clearBtn.className = "tag-clear-btn";
-    clearBtn.textContent = "Limpar tags";
+    window.clipBoardCore.setButtonIcon(clearBtn, "eraser", "Limpar tags");
     clearBtn.disabled = clearDisabled;
     clearBtn.addEventListener("click", onClear);
     container.appendChild(clearBtn);

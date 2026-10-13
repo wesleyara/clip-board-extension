@@ -17,6 +17,22 @@ const tagFilterOptions = document.getElementById("tagFilterOptions");
 const tagInput = document.getElementById("tagInput");
 const addTagBtn = document.getElementById("addTagBtn");
 const tagOptions = document.getElementById("tagOptions");
+const helpBtn = document.getElementById("helpBtn");
+const helpPanel = document.getElementById("helpPanel");
+const helpCloseBtn = document.getElementById("helpCloseBtn");
+
+window.clipBoardCore.setButtonIcon(menuBtn, "more", "Abrir menu");
+window.clipBoardCore.setButtonIcon(fabAdd, "plus", "Novo clip");
+window.clipBoardCore.setButtonIcon(addBtn, "check", "Salvar");
+window.clipBoardCore.setButtonIcon(cancelBtn, "x", "Cancelar");
+window.clipBoardCore.setButtonIcon(addTagBtn, "plus", "Adicionar tag");
+window.clipBoardCore.setButtonIcon(exportBtn, "download", "Exportar");
+exportBtn.insertAdjacentHTML("beforeend", "<span>Exportar</span>");
+window.clipBoardCore.setButtonIcon(importBtn, "upload", "Importar");
+importBtn.insertAdjacentHTML("beforeend", "<span>Importar</span>");
+window.clipBoardCore.setButtonIcon(helpBtn, "help", "Ajuda");
+helpBtn.insertAdjacentHTML("beforeend", "<span>Ajuda</span>");
+window.clipBoardCore.setButtonIcon(helpCloseBtn, "x", "Fechar ajuda");
 
 window.clipCrud.init({
   clipInput,
@@ -51,7 +67,7 @@ menuBtn.addEventListener("click", () => {
 });
 
 document.addEventListener("click", (event) => {
-  if (!menuDropdown.contains(event.target) && event.target !== menuBtn) {
+  if (!menuDropdown.contains(event.target) && !menuBtn.contains(event.target)) {
     menuDropdown.setAttribute("hidden", "");
   }
 });
@@ -71,6 +87,26 @@ filterSelect.addEventListener("change", (event) => {
 
 tagMatchSelect.addEventListener("change", (event) => {
   window.clipCrud.setFilters({ tagFilterMatchMode: event.target.value });
+});
+
+function openHelp() {
+  menuDropdown.setAttribute("hidden", "");
+  helpPanel.removeAttribute("hidden");
+  helpCloseBtn.focus();
+}
+
+function closeHelp() {
+  helpPanel.setAttribute("hidden", "");
+  menuBtn.focus();
+}
+
+helpBtn.addEventListener("click", openHelp);
+helpCloseBtn.addEventListener("click", closeHelp);
+
+document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape" && !helpPanel.hasAttribute("hidden")) {
+    closeHelp();
+  }
 });
 
 menuDropdown.setAttribute("hidden", "");

@@ -10,12 +10,11 @@
     <main class="app">
       <header class="header">
         <div class="menu">
-          <button id="menuBtn" class="icon-btn icon-btn-md" aria-label="Abrir menu">
-            ⋮
-          </button>
+          <button id="menuBtn" class="icon-btn icon-btn-md" aria-label="Abrir menu"></button>
           <div id="menuDropdown" class="menu-dropdown" hidden>
             <button id="exportBtn" class="menu-item">Exportar</button>
             <button id="importBtn" class="menu-item">Importar</button>
+            <button id="helpBtn" class="menu-item">Ajuda</button>
             <input
               id="fileInput"
               type="file"
@@ -27,9 +26,7 @@
 
         <h1 class="title">Clip Board</h1>
 
-        <button id="fabAdd" class="btn primary icon-btn-md" aria-label="Abrir menu">
-          +
-        </button>
+        <button id="fabAdd" class="btn primary icon-btn-md" aria-label="Novo clip"></button>
       </header>
 
       <section id="composer" class="composer" hidden>
@@ -97,6 +94,73 @@
           Nenhum clip salvo ainda.
           <br>
           Importe sua lista ou crie um novo!
+        </div>
+      </section>
+
+      <section id="helpPanel" class="help-panel" aria-labelledby="helpTitle" hidden>
+        <header class="help-header">
+          <h2 id="helpTitle" class="help-title">Ajuda</h2>
+          <button id="helpCloseBtn" class="icon-btn icon-btn-md" aria-label="Fechar ajuda"></button>
+        </header>
+
+        <div class="help-body">
+          <article class="help-section">
+            <h3>Criar um clip</h3>
+            <ol>
+              <li>Clique no <strong>+</strong> no canto superior direito.</li>
+              <li>Digite o texto no campo <strong>Novo clip</strong>. Espaços extras são removidos ao salvar.</li>
+              <li>Opcional: selecione uma ou mais tags.</li>
+              <li>Clique em <strong>Salvar</strong>. Para descartar, use <strong>Cancelar</strong>.</li>
+            </ol>
+          </article>
+
+          <article class="help-section">
+            <h3>Tags</h3>
+            <ul>
+              <li><strong>Criar:</strong> digite o nome em <em>Criar nova tag</em> e clique em + ou pressione Enter.</li>
+              <li><strong>Selecionar:</strong> clique em uma tag para marcá-la ou desmarcá-la no clip. Tags marcadas ficam destacadas.</li>
+              <li><strong>Remover:</strong> clique no × ao lado da tag. Ela é retirada de todos os clips.</li>
+              <li><strong>Limpar filtro:</strong> use o botão de borracha ao filtrar por tag para desmarcar todas.</li>
+            </ul>
+          </article>
+
+          <article class="help-section">
+            <h3>Buscar e filtrar</h3>
+            <ul>
+              <li><strong>Buscar:</strong> digite no campo <em>Buscar clips</em>. A lista mostra apenas os clips que contêm o texto.</li>
+              <li><strong>Todos:</strong> mostra todos os clips.</li>
+              <li><strong>Favoritos:</strong> mostra só os clips com estrela.</li>
+              <li><strong>Por tag:</strong> mostra as tags disponíveis. Escolha uma ou mais e use o modo <em>Contém uma tag</em> (qualquer uma) ou <em>Contém todas tags</em> (todas ao mesmo tempo).</li>
+            </ul>
+          </article>
+
+          <article class="help-section">
+            <h3>Ações em cada clip</h3>
+            <ul>
+              <li><strong>★ Favoritar:</strong> marca ou desmarca o clip como favorito.</li>
+              <li><strong>Copiar:</strong> copia o texto para a área de transferência.</li>
+              <li><strong>Editar:</strong> abre o formulário com o texto e as tags do clip. Clique em Salvar para atualizar.</li>
+              <li><strong>Remover:</strong> apaga o clip depois de uma confirmação.</li>
+            </ul>
+          </article>
+
+          <article class="help-section">
+            <h3>Reordenar</h3>
+            <p>Arraste um clip e solte sobre outro para trocar a ordem.</p>
+          </article>
+
+          <article class="help-section">
+            <h3>Exportar e importar</h3>
+            <ul>
+              <li><strong>Exportar:</strong> baixa um arquivo <code>.json</code> com todos os seus clips, tags e favoritos.</li>
+              <li><strong>Importar:</strong> escolha um <code>.json</code> exportado antes. Clips com o mesmo texto ou o mesmo ID já existentes são ignorados. Os demais são adicionados, sem apagar nada.</li>
+            </ul>
+          </article>
+
+          <article class="help-section">
+            <h3>Onde ficam os dados</h3>
+            <p>Seus clips são salvos localmente no navegador, pela própria extensão. Use Exportar para fazer backup.</p>
+          </article>
         </div>
       </section>
     </main>
