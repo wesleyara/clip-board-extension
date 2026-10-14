@@ -1,6 +1,15 @@
 function useClipCrud() {
-  const { storage, uiStateStorage, showStatus, formatDate, createId, normalizeContent, setButtonIcon } =
-    window.clipBoardCore;
+  const {
+    storage,
+    uiStateStorage,
+    showStatus,
+    formatDate,
+    createId,
+    normalizeContent,
+    extractVariables,
+    fillVariables,
+    setButtonIcon
+  } = window.clipBoardCore;
   const tagManager = window.createClipTagManager({ storage, showStatus });
   const dndManager = window.createClipDnDManager({ storage });
 
@@ -335,7 +344,14 @@ function useClipCrud() {
       setButtonIcon(copyBtn, "copy", "Copiar");
       copyBtn.addEventListener("click", async () => {
         try {
-          await navigator.clipboard.writeText(item.content);
+          let text = item.content;
+          const names = extractVariables(text);
+          if (names.length) {
+            const values = await window.variablePrompt.ask(names);
+            if (!values) return;
+            text = fillVariables(text, values);
+          }
+          await navigator.clipboard.writeText(text);
           showStatus("Texto copiado!", "success");
         } catch (error) {
           showStatus("Não foi possível copiar.", "error");

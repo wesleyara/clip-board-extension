@@ -145,6 +145,12 @@
           </article>
 
           <article class="help-section">
+            <h3>Variáveis</h3>
+            <p>Use <code>{{NOME}}</code> no texto do clip. Ao copiar, um popup pede o valor de cada variável e o texto preenchido é copiado. O clip salvo não muda.</p>
+            <p>Exemplo: <code>Olá {{NOME_PESSOA}}! Você atende em {{NOME_CIDADE}}?</code></p>
+          </article>
+
+          <article class="help-section">
             <h3>Reordenar</h3>
             <p>Arraste um clip e solte sobre outro para trocar a ordem.</p>
           </article>
@@ -163,9 +169,21 @@
           </article>
         </div>
       </section>
+
+      <section id="variablePanel" class="var-panel" aria-labelledby="variableTitle" hidden>
+        <form id="variableForm" class="var-card">
+          <h2 id="variableTitle" class="var-title">Preencher variáveis</h2>
+          <div id="variableFields" class="var-fields"></div>
+          <div class="var-actions">
+            <button id="variableCancelBtn" type="button" class="btn">Cancelar</button>
+            <button type="submit" class="btn primary">Copiar</button>
+          </div>
+        </form>
+      </section>
     </main>
 
     <script src="src/composables/useCore.js"></script>
+    <script src="src/composables/useVariablePrompt.js"></script>
     <script src="src/composables/useClipTagManager.js"></script>
     <script src="src/composables/useClipDnDManager.js"></script>
     <script src="src/composables/useClipCrud.js"></script>

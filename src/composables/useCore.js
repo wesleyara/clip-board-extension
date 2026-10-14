@@ -71,6 +71,20 @@ function normalizeContent(content) {
   return content.trim().replace(/\s+/g, " ");
 }
 
+const VARIABLE_PATTERN = /\{\{\s*([\p{L}\p{N}_]+)\s*\}\}/gu;
+
+function extractVariables(text) {
+  const names = [];
+  for (const match of text.matchAll(VARIABLE_PATTERN)) {
+    if (!names.includes(match[1])) names.push(match[1]);
+  }
+  return names;
+}
+
+function fillVariables(text, values) {
+  return text.replace(VARIABLE_PATTERN, (_, name) => values[name] ?? "");
+}
+
 const ICON_PATHS = {
   check: '<path d="M20 6 9 17l-5-5"/>',
   x: '<path d="M18 6 6 18M6 6l12 12"/>',
@@ -103,6 +117,8 @@ window.clipBoardCore = {
   formatDate,
   createId,
   normalizeContent,
+  extractVariables,
+  fillVariables,
   iconSvg,
   setButtonIcon
 };
